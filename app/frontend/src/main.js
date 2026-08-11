@@ -224,7 +224,10 @@
         renderCheckList(listNode, checks);
 
         if (statusNode) {
-          statusNode.textContent = checks.length > 0 ? `Showing ${checks.length} uptime checks.` : "No uptime checks configured yet.";
+          statusNode.textContent =
+            checks.length > 0
+              ? `Showing ${checks.length} uptime checks. In-memory only; results reset on restart.`
+              : "No uptime checks configured yet. In-memory only; checks reset on restart.";
           statusNode.dataset.state = checks.length > 0 ? "ok" : "idle";
         }
       } catch (error) {

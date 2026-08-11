@@ -81,7 +81,8 @@
 
       .check-meta,
       .check-result,
-      .empty-state {
+      .empty-state,
+      .in-memory-note {
         margin-top: 0.35rem;
         color: #4b5563;
       }
@@ -129,6 +130,7 @@
           <button id="refresh-checks" type="button">Refresh</button>
         </div>
         <p id="checks-status" data-state="idle">Loading uptime checks...</p>
+        <p class="in-memory-note">In-memory only: checks and results reset when the service restarts.</p>
         <ul id="checks-list"></ul>
       </section>
     </main>

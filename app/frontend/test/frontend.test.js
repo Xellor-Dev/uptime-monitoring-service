@@ -183,7 +183,8 @@ test("initUptimeChecks loads checks from the backend and renders them", async ()
 
   assert.match(listNode.innerHTML, /API/);
   assert.match(listNode.innerHTML, /https:\/\/example.com\/api/);
-  assert.equal(statusNode.textContent, "Showing 1 uptime checks.");
+  assert.match(statusNode.textContent, /Showing 1 uptime checks\./);
+  assert.match(statusNode.textContent, /In-memory only/);
 });
 
 test("renderHealthState marks error state", () => {
