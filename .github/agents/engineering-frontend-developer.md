@@ -1,7 +1,7 @@
 ---
 name: Frontend Developer
 description: Expert frontend developer specializing in modern web technologies, React/Vue/Angular frameworks, UI implementation, and performance optimization
-model: claude-haiku-4.5
+model: mai-code-1-flash
 color: cyan
 emoji: 🖥️
 vibe: Builds responsive, accessible web apps with pixel-perfect precision.
