@@ -4,9 +4,12 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 
 const {
+  fetchChecks,
   fetchHealthState,
-  renderHealthState,
   initHealthDisplay,
+  initUptimeChecks,
+  renderCheckList,
+  renderHealthState,
 } = require("../src/main");
 const { createServer } = require("../src/server");
 const { createServer: createBackendServer } = require("../../backend/src/server");
@@ -104,6 +107,83 @@ test("frontend server serves minimal page", async () => {
       server.close((error) => (error ? reject(error) : resolve())),
     );
   }
+});
+
+test("fetchChecks returns the check list from the backend", async () => {
+  const fakeFetch = async () => ({
+    ok: true,
+    json: async () => ({
+      checks: [{ id: "1", name: "Homepage", url: "https://example.com", intervalSeconds: 30, paused: false }],
+    }),
+  });
+
+  const result = await fetchChecks(fakeFetch, "http://127.0.0.1:3000");
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].name, "Homepage");
+});
+
+test("renderCheckList renders the latest result and controls", () => {
+  const target = { innerHTML: "" };
+
+  renderCheckList(target, [
+    {
+      id: "8",
+      name: "Status Page",
+      url: "https://example.com/health",
+      intervalSeconds: 60,
+      paused: false,
+      latestResult: { ok: true, httpStatus: 200 },
+    },
+  ]);
+
+  assert.match(target.innerHTML, /Status Page/);
+  assert.match(target.innerHTML, /Run now/);
+  assert.match(target.innerHTML, /Latest: Up/);
+});
+
+test("initUptimeChecks loads checks from the backend and renders them", async () => {
+  const listNode = { innerHTML: "", dataset: {}, addEventListener() {} };
+  const statusNode = { textContent: "", dataset: {} };
+  const formNode = {
+    dataset: {},
+    addEventListener() {},
+    reset() {},
+  };
+  const refreshButton = { dataset: {}, addEventListener() {} };
+
+  const fakeDocument = {
+    getElementById(id) {
+      if (id === "checks-list") return listNode;
+      if (id === "checks-status") return statusNode;
+      if (id === "check-form") return formNode;
+      if (id === "refresh-checks") return refreshButton;
+      return null;
+    },
+  };
+
+  const fakeFetch = async (url) => {
+    if (url.endsWith("/checks")) {
+      return {
+        ok: true,
+        json: async () => ({
+          checks: [{ id: "2", name: "API", url: "https://example.com/api", intervalSeconds: 45, paused: false }],
+        }),
+      };
+    }
+
+    return { ok: true, json: async () => ({}) };
+  };
+
+  await initUptimeChecks({
+    fetchImpl: fakeFetch,
+    documentRef: fakeDocument,
+    backendBaseUrl: "http://127.0.0.1:3000",
+  });
+
+  assert.match(listNode.innerHTML, /API/);
+  assert.match(listNode.innerHTML, /https:\/\/example.com\/api/);
+  assert.equal(statusNode.textContent, "Showing 1 uptime checks.");
 });
 
 test("renderHealthState marks error state", () => {

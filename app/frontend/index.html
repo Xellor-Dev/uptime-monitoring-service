@@ -4,11 +4,133 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Uptime Monitoring Service</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.5;
+        margin: 2rem;
+        color: #1f2937;
+      }
+
+      main {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      section {
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.25rem;
+        background: #f9fafb;
+      }
+
+      form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.75rem;
+      }
+
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-size: 0.95rem;
+      }
+
+      input,
+      button {
+        font: inherit;
+      }
+
+      button {
+        padding: 0.55rem 0.9rem;
+        border: 1px solid #2563eb;
+        background: #2563eb;
+        color: white;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #1d4ed8;
+      }
+
+      .check-header,
+      .check-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+
+      #checks-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .check-item {
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 0.8rem;
+        margin-top: 0.75rem;
+        background: white;
+      }
+
+      .check-meta,
+      .check-result,
+      .empty-state {
+        margin-top: 0.35rem;
+        color: #4b5563;
+      }
+
+      [data-state="error"] {
+        color: #b91c1c;
+      }
+
+      [data-state="ok"] {
+        color: #166534;
+      }
+    </style>
   </head>
   <body>
     <main>
       <h1>Uptime Monitoring Service</h1>
       <p id="health-status" data-state="loading">Checking service health...</p>
+
+      <section aria-labelledby="check-form-title">
+        <h2 id="check-form-title">Add uptime check</h2>
+        <form id="check-form">
+          <label>
+            Name
+            <input id="check-name" name="name" type="text" placeholder="Homepage" required />
+          </label>
+          <label>
+            URL
+            <input id="check-url" name="url" type="url" placeholder="https://example.com" required />
+          </label>
+          <label>
+            Interval (seconds)
+            <input id="check-interval" name="intervalSeconds" type="number" min="1" step="1" value="60" required />
+          </label>
+          <label>
+            <span>Paused</span>
+            <input id="check-paused" name="paused" type="checkbox" />
+          </label>
+          <button type="submit">Add check</button>
+        </form>
+      </section>
+
+      <section aria-labelledby="checks-title">
+        <div class="check-header">
+          <h2 id="checks-title">Uptime checks</h2>
+          <button id="refresh-checks" type="button">Refresh</button>
+        </div>
+        <p id="checks-status" data-state="idle">Loading uptime checks...</p>
+        <ul id="checks-list"></ul>
+      </section>
     </main>
     <script src="/src/main.js" defer></script>
   </body>
