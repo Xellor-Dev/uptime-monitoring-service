@@ -13,53 +13,204 @@ It defines progressive application milestones while keeping infrastructure and o
 
 ---
 
-## Milestone 1 — Smallest Useful MVP (Single-project uptime checks)
+## Milestone 1 — Smallest Useful MVP (progressive sub-milestones)
 
-### Goal
-Provide a usable baseline service that monitors URLs and shows current/recent uptime status.
+Milestone 1 is intentionally split into small, independently reviewable phases so the human DevOps owner can run, inspect, troubleshoot, and understand each version before additional application complexity is introduced.
 
-### User-facing functionality
-- Create, edit, pause, and delete uptime checks.
-- View current status (up/down) and last check time.
-- View simple recent history (for example, last 24 hours per check).
+### M1.1 — Minimal application skeleton
 
-### Backend requirements
-- Core scheduler/executor for HTTP/HTTPS checks.
-- Status evaluation rules (success/failure/timeout).
-- CRUD API for checks and status/history retrieval.
-- Basic structured error handling and application logs.
+#### Goal
+Establish the smallest end-to-end application baseline.
 
-### Frontend requirements
-- Minimal dashboard to list checks and current state.
-- Basic forms to create and update checks.
-- Simple per-check history view.
+#### User-facing functionality
+- Render a minimal frontend page that confirms the app is running.
+- Expose basic service health status.
 
-### Database/application data requirements
-- Check definition entity (name, URL, interval, timeout, active flag).
-- Check result entity (timestamp, response time, status, error reason).
-- Basic retention rule for historical check results.
+#### Backend requirements
+- Minimal backend service bootstrapped with one health endpoint.
+- Basic request/response plumbing and error handling baseline.
 
-### Application testing requirements
-- Unit tests for status evaluation and validation rules.
-- Integration tests for check CRUD and result recording.
-- End-to-end test for create check → run check → status visible in UI/API.
+#### Frontend requirements
+- Minimal frontend shell/page connected to backend health state display.
+
+#### Database/application data requirements
+- No persistent database in this phase.
+- No PostgreSQL, Redis, queues, or background workers.
+
+#### Application testing requirements
+- Application-level tests for backend health endpoint behavior.
+- Application-level tests that verify the frontend renders and can show health state.
 
 ## DevOps Requirements
 Describe runtime needs only (not implementation details):
-- Persistent runtime for the application process.
-- Persistent data storage for application records.
-- Outbound network access to monitored targets.
-- Stable and synchronized system time.
-- Accessible runtime logs for troubleshooting.
+- Runtime capable of executing one backend process and one frontend process/build output.
+- Network access between frontend and backend within runtime environment.
+- Ability to observe application startup output and health response.
 
-### Acceptance criteria
-- Users can manage checks and view current state/history in one UI.
-- Scheduled checks run at configured intervals.
-- Check outcomes persist across restarts.
-- Supports a small set of concurrent checks for one project/team.
+#### Acceptance criteria
+- Backend health endpoint responds successfully.
+- Frontend minimal page is reachable and shows expected basic state.
+- Tests for health path and minimal UI pass.
 
-### Dependencies on previous milestones
+#### Dependencies on previous milestones
 - None.
+
+#### Human DevOps pause gate before M1.2
+After M1.1 application implementation, development pauses for human-owned runtime validation and inspection before any M1.2 work begins.
+
+### M1.2 — Basic uptime checks without persistent storage
+
+#### Goal
+Introduce first useful monitoring behavior without adding persistence.
+
+#### User-facing functionality
+- Create, list, update, pause, and delete uptime checks in-memory.
+- Run manual checks and view immediate result state.
+
+#### Backend requirements
+- In-memory check model and validation.
+- HTTP/HTTPS check execution on demand (manual trigger).
+- API endpoints for in-memory check CRUD and latest result.
+
+#### Frontend requirements
+- UI for in-memory check management.
+- UI control to run a check manually and view latest result.
+
+#### Database/application data requirements
+- In-memory storage only; data resets on restart.
+
+#### Application testing requirements
+- Unit tests for URL/interval validation and check result mapping.
+- Integration tests for in-memory CRUD and manual check execution.
+
+## DevOps Requirements
+Describe runtime needs only (not implementation details):
+- Outbound network access from runtime to monitored endpoints.
+- Runtime visibility to inspect transient behavior across restarts.
+
+#### Acceptance criteria
+- Users can manage checks and run checks manually.
+- Results are visible immediately and clearly marked non-persistent.
+
+#### Dependencies on previous milestones
+- Depends on M1.1 baseline application skeleton.
+
+### M1.3 — PostgreSQL persistence
+
+#### Goal
+Add durable storage for checks and latest results.
+
+#### User-facing functionality
+- Previously created checks remain available after restart.
+- Latest check result persists and is visible after restart.
+
+#### Backend requirements
+- Persistent repository layer backed by PostgreSQL.
+- Data mapping/migration support for checks and latest results.
+- API behavior unchanged from M1.2 from user perspective.
+
+#### Frontend requirements
+- Existing M1.2 UI retained; behavior reflects persisted data.
+
+#### Database/application data requirements
+- PostgreSQL schema for check definitions and latest check result state.
+- Basic migration/versioning strategy for schema evolution.
+
+#### Application testing requirements
+- Integration tests validating persistence behavior across restarts (or equivalent lifecycle tests).
+- Tests for repository error handling and validation constraints.
+
+## DevOps Requirements
+Describe runtime needs only (not implementation details):
+- Application runtime access to persistent PostgreSQL storage.
+- Runtime configuration for database connection settings and secrets.
+- Data durability appropriate for retaining check configuration and latest state.
+
+#### Acceptance criteria
+- Check definitions and latest results persist across restarts.
+- App handles unavailable database dependency with clear error signaling.
+
+#### Dependencies on previous milestones
+- Depends on M1.2 in-memory check lifecycle/API contract.
+
+### M1.4 — Scheduled checks and history
+
+#### Goal
+Automate checks and store time-series result history.
+
+#### User-facing functionality
+- Checks run automatically by configured interval.
+- Users can view recent check history and status trend.
+
+#### Backend requirements
+- Internal scheduler for interval-based check execution.
+- History recording for each execution result.
+- Failure/timeout classification and response-time capture.
+
+#### Frontend requirements
+- Current status plus recent history display per check.
+- Interval configuration controls.
+
+#### Database/application data requirements
+- Persistent history records linked to checks.
+- Retention policy definition for historical results.
+
+#### Application testing requirements
+- Tests for scheduler timing behavior and missed-run handling.
+- Integration tests for history persistence and retrieval.
+
+## DevOps Requirements
+Describe runtime needs only (not implementation details):
+- Stable runtime clock/time synchronization for reliable scheduling.
+- Persistent storage capacity for historical result growth.
+- Runtime observability for scheduler execution health.
+
+#### Acceptance criteria
+- Scheduled checks execute reliably at configured intervals.
+- Recent history is queryable and visible in UI.
+
+#### Dependencies on previous milestones
+- Depends on M1.3 persistent data layer.
+
+### M1.5 — MVP stabilization
+
+#### Goal
+Harden MVP quality before moving to Milestone 2 features.
+
+#### User-facing functionality
+- More predictable error states and clearer degraded/unavailable messaging.
+- Stable baseline UX for check management and history viewing.
+
+#### Backend requirements
+- Input validation hardening and consistent error contracts.
+- Reliability pass for scheduler/check execution edge cases.
+- Basic health/readiness behavior aligned with runtime troubleshooting needs.
+
+#### Frontend requirements
+- Error-state UX improvements and form validation feedback.
+- Minor usability improvements without adding new major features.
+
+#### Database/application data requirements
+- Index/constraint review for current MVP queries and writes.
+- Retention/cleanup behavior validated for history data.
+
+#### Application testing requirements
+- Targeted regression suite for M1.1–M1.4 flows.
+- Expanded integration tests for restart and failure scenarios.
+
+## DevOps Requirements
+Describe runtime needs only (not implementation details):
+- Runtime logging/visibility sufficient to diagnose failed checks and scheduler errors.
+- Repeatable runtime startup behavior that can be validated by human owner.
+- Clear health endpoints/signals for service status inspection.
+
+#### Acceptance criteria
+- Core MVP flows pass regression tests reliably.
+- Known high-risk failure paths produce expected, diagnosable behavior.
+- MVP is ready for alerting/incident work in Milestone 2.
+
+#### Dependencies on previous milestones
+- Depends on M1.1 through M1.4.
 
 ---
 
@@ -206,9 +357,58 @@ Describe runtime needs only (not implementation details):
 
 ## Proposed GitHub Issues for Milestone 1 (for human review; do not create yet)
 
-1. Define MVP domain model for checks and check results.
-2. Document MVP API surface for check management and status retrieval.
-3. Define scheduler/check execution behavior and status rules (product spec).
-4. Design minimal dashboard UX for check list and per-check history.
-5. Define Milestone 1 acceptance test matrix (unit/integration/end-to-end).
-6. Document Milestone 1 runtime requirements handoff to DevOps owner.
+### M1.1 — Minimal application skeleton
+
+1. **[AI application work] Create minimal backend skeleton with health endpoint**
+   - Required outcome: running backend with a health endpoint suitable for runtime inspection.
+2. **[AI application work] Create minimal frontend skeleton and health display**
+   - Required outcome: minimal UI page that confirms service availability and health status.
+3. **[AI review/testing] Add application-level tests for M1.1 backend/frontend baseline**
+   - Required outcome: tests validating backend health behavior and minimal frontend render path.
+4. **[Human DevOps work] Run and inspect M1.1 runtime behavior (learning checkpoint)**
+   - Learning objective: understand baseline app runtime lifecycle, logs, endpoint reachability, and failure signals.
+   - Required outcome: documented confirmation that M1.1 can be run/inspected and is ready for M1.2.
+
+### M1.2 — Basic uptime checks without persistence
+
+5. **[AI application work] Implement in-memory check CRUD and manual execution API**
+   - Required outcome: users can manage checks and trigger manual check runs without persistence.
+6. **[AI application work] Implement minimal UI for in-memory checks and latest result**
+   - Required outcome: UI can create/manage checks and display manual run outcomes.
+7. **[AI review/testing] Add tests for in-memory check flow and validation**
+   - Required outcome: tests cover in-memory CRUD, validation, and manual check execution paths.
+8. **[Human DevOps work] Validate restart behavior and outbound reachability for M1.2**
+   - Learning objective: observe ephemeral data behavior and runtime networking constraints.
+   - Required outcome: documented verification of expected data reset-on-restart and endpoint reachability characteristics.
+
+### M1.3 — PostgreSQL persistence
+
+9. **[AI application work] Add PostgreSQL-backed persistence for checks and latest result**
+   - Required outcome: check definitions/latest status survive restarts using PostgreSQL.
+10. **[AI review/testing] Add persistence integration tests for M1.3**
+    - Required outcome: tests validate durable behavior and repository error handling.
+11. **[Human DevOps work] Provide runtime PostgreSQL capability for app consumption**
+    - Learning objective: understand application database dependency boundaries, configuration, and durability expectations.
+    - Required outcome: runtime environment can supply persistent PostgreSQL connectivity required by the app.
+
+### M1.4 — Scheduled checks and history
+
+12. **[AI application work] Implement interval scheduler and persistent check history**
+    - Required outcome: checks execute on schedule and history is stored/retrieved.
+13. **[AI application work] Extend UI for interval configuration and history visibility**
+    - Required outcome: UI supports interval setup and recent history viewing.
+14. **[AI review/testing] Add scheduler/history test coverage**
+    - Required outcome: tests cover scheduling behavior, timeout/failure mapping, and history retrieval.
+15. **[Human DevOps work] Validate runtime clock stability and history growth characteristics**
+    - Learning objective: understand timing sensitivity and storage growth implications of scheduled workloads.
+    - Required outcome: documented validation that runtime supports stable scheduling behavior and expected history data growth.
+
+### M1.5 — MVP stabilization
+
+16. **[AI application work] Stabilize error contracts and core UX for MVP readiness**
+    - Required outcome: predictable API/UI behavior under common failure and validation scenarios.
+17. **[AI review/testing] Build targeted regression suite for M1.1–M1.4**
+    - Required outcome: reliable regression coverage for core MVP flows.
+18. **[Human DevOps work] Final Milestone 1 runtime readiness review**
+    - Learning objective: evaluate operational readiness of the MVP baseline before alerting features.
+    - Required outcome: explicit go/no-go decision for entering Milestone 2.
