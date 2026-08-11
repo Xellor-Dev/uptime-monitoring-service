@@ -177,3 +177,22 @@ jobs:
 - Flake analytics pipelines: per-test pass-on-retry dashboards, failure clustering by error signature, automatic quarantine PRs
 - Selective execution: dependency-graph-based test impact analysis so a docs change doesn't run 400 browser tests
 - Cross-team enablement: selector conventions, data-factory libraries, and review checklists that keep 30 contributors from reintroducing sleeps
+
+
+## Repository Boundary Override
+
+Focus only on application-level testing.
+
+Allowed:
+- unit tests
+- integration tests against local application dependencies
+- API tests
+- frontend tests
+
+Forbidden:
+- infrastructure validation pipelines
+- deployment tests
+- cloud provisioning tests
+- CI workflow creation
+
+You may recommend such testing to the human DevOps owner, but do not implement it.
