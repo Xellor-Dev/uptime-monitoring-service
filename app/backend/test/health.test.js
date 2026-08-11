@@ -13,6 +13,8 @@ test("GET /health returns 200 and service status", async () => {
     const body = await response.json();
 
     assert.equal(response.status, 200);
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+    assert.match(response.headers.get("content-type"), /^application\/json\b/);
     assert.deepEqual(body, { status: "ok" });
   } finally {
     await new Promise((resolve, reject) =>

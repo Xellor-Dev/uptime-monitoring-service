@@ -9,6 +9,7 @@ const {
   initHealthDisplay,
 } = require("../src/main");
 const { createServer } = require("../src/server");
+const { createServer: createBackendServer } = require("../../backend/src/server");
 
 test("index page includes minimal health display skeleton", async () => {
   const indexPath = path.resolve(__dirname, "..", "index.html");
@@ -53,6 +54,38 @@ test("initHealthDisplay updates health status text", async () => {
 
   assert.equal(healthNode.textContent, "Backend health: ok");
   assert.equal(healthNode.dataset.state, "ok");
+});
+
+test("initHealthDisplay renders healthy state from the backend health endpoint", async () => {
+  const backendServer = createBackendServer();
+  await new Promise((resolve) => backendServer.listen(0, resolve));
+
+  const healthNode = {
+    textContent: "Checking service health...",
+    dataset: {},
+  };
+
+  const fakeDocument = {
+    getElementById(id) {
+      return id === "health-status" ? healthNode : null;
+    },
+  };
+
+  try {
+    const { port } = backendServer.address();
+
+    await initHealthDisplay({
+      documentRef: fakeDocument,
+      backendBaseUrl: `http://127.0.0.1:${port}`,
+    });
+
+    assert.equal(healthNode.textContent, "Backend health: ok");
+    assert.equal(healthNode.dataset.state, "ok");
+  } finally {
+    await new Promise((resolve, reject) =>
+      backendServer.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
 });
 
 test("frontend server serves minimal page", async () => {
