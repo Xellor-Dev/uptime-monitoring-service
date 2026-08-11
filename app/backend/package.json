@@ -1,0 +1,17 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Minimal backend skeleton for uptime monitoring service",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "uptime",
+    "backend",
+    "health"
+  ],
+  "author": "GitHub Copilot",
+  "license": "ISC"
+}
