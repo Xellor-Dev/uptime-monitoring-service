@@ -74,6 +74,29 @@ test("runManualCheck maps request failures to a down result", async () => {
   assert.equal(result.error, "network unreachable");
 });
 
+test("runManualCheck marks timed out requests", async () => {
+  const result = await runManualCheck(
+    { url: "https://example.com/health" },
+    async (_url, { signal }) =>
+      new Promise((_, reject) => {
+        signal.addEventListener(
+          "abort",
+          () => {
+            const error = new Error("Aborted");
+            error.name = "AbortError";
+            reject(error);
+          },
+          { once: true },
+        );
+      }),
+    1,
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "down");
+  assert.equal(result.error, "Request timed out");
+});
+
 test("uptime check CRUD and manual run work end to end in memory", async () => {
   const server = createServer({
     fetchImpl: async () => ({
@@ -108,6 +131,14 @@ test("uptime check CRUD and manual run work end to end in memory", async () => {
     assert.equal(listResponse.status, 200);
     assert.equal(listBody.checks.length, 1);
     assert.equal(listBody.checks[0].id, createdBody.check.id);
+
+    const missingResultResponse = await fetch(
+      `http://127.0.0.1:${port}/checks/${createdBody.check.id}/result`,
+    );
+    const missingResultBody = await missingResultResponse.json();
+
+    assert.equal(missingResultResponse.status, 404);
+    assert.deepEqual(missingResultBody, { error: "No result available" });
 
     const updateResponse = await fetch(
       `http://127.0.0.1:${port}/checks/${createdBody.check.id}`,
@@ -158,6 +189,73 @@ test("uptime check CRUD and manual run work end to end in memory", async () => {
 
     assert.equal(missingResponse.status, 404);
     assert.deepEqual(missingBody, { error: "Not Found" });
+  } finally {
+    await close(server);
+  }
+});
+
+test("invalid JSON payloads return a 400 error", async () => {
+  const server = createServer();
+  await listen(server);
+
+  try {
+    const { port } = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/checks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(body, { error: "Invalid JSON body" });
+  } finally {
+    await close(server);
+  }
+});
+
+test("empty request bodies return a 400 error", async () => {
+  const server = createServer();
+  await listen(server);
+
+  try {
+    const { port } = server.address();
+    const response = await fetch(`http://127.0.0.1:${port}/checks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(body, { error: "Invalid JSON body" });
+  } finally {
+    await close(server);
+  }
+});
+
+test("unknown check ids return 404 for lookup and update", async () => {
+  const server = createServer();
+  await listen(server);
+
+  try {
+    const { port } = server.address();
+    const missingId = "999";
+
+    const getResponse = await fetch(`http://127.0.0.1:${port}/checks/${missingId}`);
+    const getBody = await getResponse.json();
+
+    assert.equal(getResponse.status, 404);
+    assert.deepEqual(getBody, { error: "Not Found" });
+
+    const patchResponse = await fetch(`http://127.0.0.1:${port}/checks/${missingId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paused: true }),
+    });
+    const patchBody = await patchResponse.json();
+
+    assert.equal(patchResponse.status, 404);
+    assert.deepEqual(patchBody, { error: "Not Found" });
   } finally {
     await close(server);
   }

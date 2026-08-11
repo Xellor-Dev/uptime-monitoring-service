@@ -1,13 +1,18 @@
 const http = require("node:http");
 
 const DEFAULT_PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
+const REQUEST_TIMEOUT_MS = 5000;
+const ALLOWED_ORIGIN = process.env.CORS_ORIGIN ?? "*";
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+  "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
 function json(res, statusCode, body) {
   res.writeHead(statusCode, {
     "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    ...CORS_HEADERS,
   });
   res.end(JSON.stringify(body));
 }
@@ -161,16 +166,26 @@ async function readJsonBody(req) {
   }
 
   if (chunks.length === 0) {
-    return {};
+    const error = new Error("Invalid JSON body");
+    error.statusCode = 400;
+    throw error;
   }
 
   const rawBody = Buffer.concat(chunks).toString("utf8");
 
   if (rawBody.trim() === "") {
-    return {};
+    const error = new Error("Invalid JSON body");
+    error.statusCode = 400;
+    throw error;
   }
 
-  return JSON.parse(rawBody);
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    const error = new Error("Invalid JSON body");
+    error.statusCode = 400;
+    throw error;
+  }
 }
 
 function getRoute(requestUrl) {
@@ -182,10 +197,6 @@ function getRoute(requestUrl) {
 
   if (pathname === "/checks") {
     return { type: "checks" };
-  }
-
-  if (pathname === "/checks/" || pathname === "/checks//") {
-    return { type: "unknown" };
   }
 
   const match = pathname.match(/^\/checks\/([^/]+)(?:\/(run|result))?$/);
@@ -201,10 +212,10 @@ function getRoute(requestUrl) {
   };
 }
 
-async function runManualCheck(check, fetchImpl = globalThis.fetch) {
+async function runManualCheck(check, fetchImpl = globalThis.fetch, timeoutMs = REQUEST_TIMEOUT_MS) {
   const startedAt = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetchImpl(check.url, {
@@ -218,7 +229,7 @@ async function runManualCheck(check, fetchImpl = globalThis.fetch) {
       ok: response.ok,
       status: response.ok ? "up" : "down",
       httpStatus: response.status,
-      checkedAt: new Date().toISOString(),
+      checkedAt: new Date(startedAt).toISOString(),
       durationMs,
     };
   } catch (error) {
@@ -227,8 +238,8 @@ async function runManualCheck(check, fetchImpl = globalThis.fetch) {
     return {
       ok: false,
       status: "down",
-      error: error?.name === "AbortError" ? "Request timed out" : (error?.message ?? "Request failed"),
-      checkedAt: new Date().toISOString(),
+      error: controller.signal.aborted ? "Request timed out" : (error?.message ?? "Request failed"),
+      checkedAt: new Date(startedAt).toISOString(),
       durationMs,
     };
   } finally {
@@ -236,15 +247,13 @@ async function runManualCheck(check, fetchImpl = globalThis.fetch) {
   }
 }
 
-function createServer({ store = createCheckStore(), fetchImpl = globalThis.fetch } = {}) {
+function createServer({ store, fetchImpl = globalThis.fetch } = {}) {
+  const runtimeStore = store ?? createCheckStore();
+
   return http.createServer(async (req, res) => {
     try {
       if (req.method === "OPTIONS") {
-        res.writeHead(204, {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-        });
+        res.writeHead(204, CORS_HEADERS);
         return res.end();
       }
 
@@ -256,7 +265,7 @@ function createServer({ store = createCheckStore(), fetchImpl = globalThis.fetch
 
       if (route.type === "checks") {
         if (req.method === "GET") {
-          return json(res, 200, { checks: store.list() });
+          return json(res, 200, { checks: runtimeStore.list() });
         }
 
         if (req.method === "POST") {
@@ -267,12 +276,12 @@ function createServer({ store = createCheckStore(), fetchImpl = globalThis.fetch
             return json(res, 400, { error: "Validation Error", details: errors });
           }
 
-          return json(res, 201, { check: store.create(value) });
+          return json(res, 201, { check: runtimeStore.create(value) });
         }
       }
 
       if (route.type === "check") {
-        const check = store.get(route.id);
+        const check = runtimeStore.get(route.id);
 
         if (!check) {
           return json(res, 404, { error: "Not Found" });
@@ -283,6 +292,10 @@ function createServer({ store = createCheckStore(), fetchImpl = globalThis.fetch
         }
 
         if (req.method === "GET" && route.action === "result") {
+          if (!check.latestResult) {
+            return json(res, 404, { error: "No result available" });
+          }
+
           return json(res, 200, { result: check.latestResult });
         }
 
@@ -294,28 +307,28 @@ function createServer({ store = createCheckStore(), fetchImpl = globalThis.fetch
             return json(res, 400, { error: "Validation Error", details: errors });
           }
 
-          return json(res, 200, { check: store.update(route.id, value) });
+          return json(res, 200, { check: runtimeStore.update(route.id, value) });
         }
 
         if (req.method === "DELETE" && route.action === "item") {
-          store.remove(route.id);
-          res.writeHead(204, {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-          });
+          runtimeStore.remove(route.id);
+          res.writeHead(204, CORS_HEADERS);
           return res.end();
         }
 
         if (req.method === "POST" && route.action === "run") {
           const result = await runManualCheck(check, fetchImpl);
-          const updatedCheck = store.setLatestResult(route.id, result);
+          const updatedCheck = runtimeStore.setLatestResult(route.id, result);
           return json(res, 200, { check: updatedCheck, result });
         }
       }
 
       return json(res, 404, { error: "Not Found" });
     } catch (error) {
+      if (error?.statusCode === 400) {
+        return json(res, 400, { error: error.message });
+      }
+
       return json(res, 500, { error: "Internal Server Error" });
     }
   });
