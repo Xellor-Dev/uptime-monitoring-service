@@ -13,5 +13,8 @@
     "health"
   ],
   "author": "GitHub Copilot",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "pg": "^8.23.0"
+  }
 }
