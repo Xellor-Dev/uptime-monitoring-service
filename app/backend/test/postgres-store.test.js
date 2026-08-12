@@ -69,3 +69,36 @@ test("PostgreSQL store initializes its schema and maps persisted checks", async 
   });
   assert.equal(persisted.latestResult.status, "up");
 });
+
+test("PostgreSQL store surfaces schema initialization failures", async () => {
+  const error = new Error("database unavailable");
+  const pool = {
+    query: async () => {
+      throw error;
+    },
+    end: async () => {},
+  };
+
+  const store = createPostgresCheckStore({ pool });
+
+  await assert.rejects(store.ready, (cause) => cause === error);
+  await assert.rejects(store.list(), (cause) => cause === error);
+});
+
+test("PostgreSQL store surfaces repository query failures", async () => {
+  const error = new Error("connection lost");
+  const pool = {
+    async query(text) {
+      if (text.includes("CREATE TABLE IF NOT EXISTS")) {
+        return { rows: [] };
+      }
+
+      throw error;
+    },
+    end: async () => {},
+  };
+
+  const store = createPostgresCheckStore({ pool });
+
+  await assert.rejects(store.list(), (cause) => cause === error);
+});
