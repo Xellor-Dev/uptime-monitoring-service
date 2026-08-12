@@ -60,4 +60,3 @@ xellor@Daniels-MacBook-Pro backend %
 ## What I Understood
 
 - The `/home/runner/work/...` path in `README.md` belongs to the CI environment, not my local Mac.
--
