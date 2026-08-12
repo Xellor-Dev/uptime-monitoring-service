@@ -1,4 +1,5 @@
 const http = require("node:http");
+const { createPostgresCheckStore } = require("./postgres-store");
 
 const DEFAULT_PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 const REQUEST_TIMEOUT_MS = 5000;
@@ -248,10 +249,15 @@ async function runManualCheck(check, fetchImpl = globalThis.fetch, timeoutMs = R
 }
 
 function createServer({ store, fetchImpl = globalThis.fetch } = {}) {
-  const runtimeStore = store ?? createCheckStore();
+  const runtimeStore =
+    store ?? (process.env.DATABASE_URL ? createPostgresCheckStore({ connectionString: process.env.DATABASE_URL }) : createCheckStore());
 
   return http.createServer(async (req, res) => {
     try {
+      if (runtimeStore.ready) {
+        await runtimeStore.ready;
+      }
+
       if (req.method === "OPTIONS") {
         res.writeHead(204, CORS_HEADERS);
         return res.end();
@@ -265,7 +271,7 @@ function createServer({ store, fetchImpl = globalThis.fetch } = {}) {
 
       if (route.type === "checks") {
         if (req.method === "GET") {
-          return json(res, 200, { checks: runtimeStore.list() });
+          return json(res, 200, { checks: await runtimeStore.list() });
         }
 
         if (req.method === "POST") {
@@ -276,12 +282,12 @@ function createServer({ store, fetchImpl = globalThis.fetch } = {}) {
             return json(res, 400, { error: "Validation Error", details: errors });
           }
 
-          return json(res, 201, { check: runtimeStore.create(value) });
+          return json(res, 201, { check: await runtimeStore.create(value) });
         }
       }
 
       if (route.type === "check") {
-        const check = runtimeStore.get(route.id);
+        const check = await runtimeStore.get(route.id);
 
         if (!check) {
           return json(res, 404, { error: "Not Found" });
@@ -307,18 +313,18 @@ function createServer({ store, fetchImpl = globalThis.fetch } = {}) {
             return json(res, 400, { error: "Validation Error", details: errors });
           }
 
-          return json(res, 200, { check: runtimeStore.update(route.id, value) });
+          return json(res, 200, { check: await runtimeStore.update(route.id, value) });
         }
 
         if (req.method === "DELETE" && route.action === "item") {
-          runtimeStore.remove(route.id);
+          await runtimeStore.remove(route.id);
           res.writeHead(204, CORS_HEADERS);
           return res.end();
         }
 
         if (req.method === "POST" && route.action === "run") {
           const result = await runManualCheck(check, fetchImpl);
-          const updatedCheck = runtimeStore.setLatestResult(route.id, result);
+          const updatedCheck = await runtimeStore.setLatestResult(route.id, result);
           return json(res, 200, { check: updatedCheck, result });
         }
       }
@@ -344,6 +350,7 @@ if (require.main === module) {
 
 module.exports = {
   createCheckStore,
+  createPostgresCheckStore,
   createServer,
   runManualCheck,
   validateCheckInput,

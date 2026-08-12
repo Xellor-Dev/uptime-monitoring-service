@@ -23,6 +23,11 @@ Health endpoint:
 curl http://127.0.0.1:3000/health
 ```
 
+For durable check definitions and latest results, set `DATABASE_URL` to a
+PostgreSQL connection string before starting the backend. The application
+creates its required tables on startup. Without `DATABASE_URL`, the backend
+uses an in-memory store for development and tests.
+
 
 ## Frontend (M1.1 skeleton)
 
