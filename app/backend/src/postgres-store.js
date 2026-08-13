@@ -1,8 +1,5 @@
-const fs = require("node:fs");
-const path = require("node:path");
 const { Pool } = require("pg");
-
-const SCHEMA_PATH = path.join(__dirname, "schema.sql");
+const { loadMigrations, migrate } = require("./migrations");
 
 function mapCheck(row) {
   if (!row) {
@@ -24,10 +21,22 @@ function mapCheck(row) {
 function createPostgresCheckStore({
   pool,
   connectionString,
-  schema = fs.readFileSync(SCHEMA_PATH, "utf8"),
+  schema,
 } = {}) {
   pool ??= new Pool({ connectionString: connectionString ?? process.env.DATABASE_URL });
-  const ready = pool.query(schema);
+  const migrations = schema ? [{ name: "001_initial.sql", sql: schema }] : loadMigrations();
+  let dependencyState = "pending";
+  let migrationError;
+  const ready = migrate(pool, migrations).then(
+    () => {
+      dependencyState = "up";
+    },
+    (error) => {
+      dependencyState = "down";
+      migrationError = error;
+      throw error;
+    },
+  );
 
   async function find(id) {
     const { rows } = await pool.query(
@@ -43,6 +52,12 @@ function createPostgresCheckStore({
 
   return {
     ready,
+    dependencyStatus() {
+      if (dependencyState === "down") {
+        return { status: "down", error: migrationError };
+      }
+      return { status: dependencyState };
+    },
     async list() {
       await ready;
       const { rows } = await pool.query(
