@@ -257,16 +257,10 @@ function createServer({ store, fetchImpl = globalThis.fetch } = {}) {
       if (req.method === "GET" && getRoute(req.url).type === "health") {
         if (runtimeStore.dependencyStatus) {
           const dependency = runtimeStore.dependencyStatus();
-          if (dependency.status === "down") {
+          if (dependency.status !== "up") {
             return json(res, 503, {
               status: "degraded",
-              dependencies: { database: { status: "down" } },
-            });
-          }
-          if (dependency.status === "pending") {
-            return json(res, 503, {
-              status: "degraded",
-              dependencies: { database: { status: "pending" } },
+              dependencies: { database: { status: dependency.status } },
             });
           }
         }
