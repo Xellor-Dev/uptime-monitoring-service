@@ -27,14 +27,17 @@ async function migrate(pool, migrations = loadMigrations()) {
       continue;
     }
 
-    await pool.query("BEGIN");
+    const client = pool.connect ? await pool.connect() : pool;
     try {
-      await pool.query(migration.sql);
-      await pool.query("INSERT INTO schema_migrations (name) VALUES ($1)", [migration.name]);
-      await pool.query("COMMIT");
+      await client.query("BEGIN");
+      await client.query(migration.sql);
+      await client.query("INSERT INTO schema_migrations (name) VALUES ($1)", [migration.name]);
+      await client.query("COMMIT");
     } catch (error) {
-      await pool.query("ROLLBACK").catch(() => {});
+      await client.query("ROLLBACK").catch(() => {});
       throw error;
+    } finally {
+      client.release?.();
     }
   }
 }

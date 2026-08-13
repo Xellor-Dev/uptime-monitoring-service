@@ -56,7 +56,8 @@ test("PostgreSQL store initializes its schema and maps persisted checks", async 
   });
   const persisted = await store.get("7");
 
-  assert.equal(calls[0].text.includes("CREATE TABLE IF NOT EXISTS checks"), true);
+  assert.equal(calls.some(({ text }) => text.includes("CREATE TABLE IF NOT EXISTS checks")), true);
+  assert.equal(calls.some(({ text }) => text.includes("schema_migrations")), true);
   assert.deepEqual(created, {
     id: "7",
     name: "Homepage",

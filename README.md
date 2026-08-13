@@ -25,8 +25,9 @@ curl http://127.0.0.1:3000/health
 
 For durable check definitions and latest results, set `DATABASE_URL` to a
 PostgreSQL connection string before starting the backend. The application
-creates its required tables on startup. Without `DATABASE_URL`, the backend
-uses an in-memory store for development and tests.
+applies the numbered SQL migrations in `app/backend/migrations` on startup.
+Without `DATABASE_URL`, the backend uses an in-memory store for development and
+tests.
 
 ## Local PostgreSQL runtime
 
@@ -93,7 +94,8 @@ curl --fail http://127.0.0.1:3000/checks
 
 The expected health response is `{"status":"ok"}`. When `DATABASE_URL` is
 present, this response also confirms that the backend connected to PostgreSQL
-and initialized its application tables.
+and applied its application migrations. If the database is unavailable, health
+returns HTTP `503` with a `degraded` status and a database dependency status.
 
 To run the PostgreSQL integration tests, load the environment and construct
 `DATABASE_URL` as shown above, then run:
