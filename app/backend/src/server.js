@@ -254,6 +254,19 @@ function createServer({ store, fetchImpl = globalThis.fetch } = {}) {
 
   return http.createServer(async (req, res) => {
     try {
+      if (req.method === "GET" && getRoute(req.url).type === "health") {
+        if (runtimeStore.dependencyStatus) {
+          const dependency = runtimeStore.dependencyStatus();
+          if (dependency.status !== "up") {
+            return json(res, 503, {
+              status: "degraded",
+              dependencies: { database: { status: dependency.status } },
+            });
+          }
+        }
+        return json(res, 200, { status: "ok" });
+      }
+
       if (runtimeStore.ready) {
         await runtimeStore.ready;
       }
@@ -264,10 +277,6 @@ function createServer({ store, fetchImpl = globalThis.fetch } = {}) {
       }
 
       const route = getRoute(req.url);
-
-      if (req.method === "GET" && route.type === "health") {
-        return json(res, 200, { status: "ok" });
-      }
 
       if (route.type === "checks") {
         if (req.method === "GET") {
@@ -335,6 +344,12 @@ function createServer({ store, fetchImpl = globalThis.fetch } = {}) {
         return json(res, 400, { error: error.message });
       }
 
+      if (runtimeStore.dependencyStatus?.().status === "down") {
+        return json(res, 503, {
+          error: "Dependency Unavailable",
+          dependency: "database",
+        });
+      }
       return json(res, 500, { error: "Internal Server Error" });
     }
   });
